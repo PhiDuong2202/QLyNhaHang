@@ -1,4 +1,4 @@
-﻿import { Menu } from "antd";
+import { Menu } from "antd";
 import {
     DashboardOutlined,
     AppstoreOutlined,
@@ -9,6 +9,7 @@ import {
     StarOutlined,
     SafetyCertificateOutlined,
     DollarCircleOutlined,
+    TeamOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 
@@ -25,6 +26,7 @@ export default function Sidebar() {
         { key: "/admin/customers", icon: <UserOutlined />, label: "Khách hàng" },
         { key: "/admin/reviews", icon: <StarOutlined />, label: "Đánh giá" },
         { key: "/admin/revenue", icon: <DollarCircleOutlined />, label: "Doanh thu" },
+        { key: "/admin/users", icon: <TeamOutlined />, label: "Tài khoản" },
     ];
 
     return (

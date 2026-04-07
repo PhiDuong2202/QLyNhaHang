@@ -8,6 +8,7 @@ import Tables from "../pages/admin/Tables";
 import Customers from "../pages/admin/Customers";
 import Reviews from "../pages/admin/Reviews";
 import Revenue from "../pages/admin/Revenue";
+import Users from "../pages/admin/Users";
 import ProtectedRoute from "./ProtectedRoute";
 import RoleRoute from "./RoleRoute";
 
@@ -31,6 +32,7 @@ export default function AdminRoutes() {
         <Route path="customers" element={<Customers />} />
         <Route path="reviews" element={<Reviews />} />
         <Route path="revenue" element={<Revenue />} />
+        <Route path="users" element={<Users />} />
       </Route>
     </Routes>
   );

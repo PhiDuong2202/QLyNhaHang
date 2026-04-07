@@ -11,7 +11,8 @@ use App\Http\Controllers\Api\{
     OrderController,
     OrderItemController,
     PaymentController,
-    ReviewController
+    ReviewController,
+    UserController
 };
 use App\Http\Controllers\AuthController;
 
@@ -44,4 +45,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('orders', OrderController::class);
     Route::apiResource('order-items', OrderItemController::class);
     Route::apiResource('payments', PaymentController::class);
+    Route::apiResource('users', UserController::class);
 });
