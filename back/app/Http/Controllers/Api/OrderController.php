@@ -63,6 +63,7 @@ class OrderController extends Controller
             'status' => 'nullable|string',
             'total_price' => 'nullable|numeric',
             'order_type' => 'nullable|string|in:dine_in,take_away,preorder',
+            'payment_method' => 'nullable|string',
         ]);
 
         $order->update($data);
@@ -85,11 +86,10 @@ class OrderController extends Controller
             }
         }
 
-        // nếu chuyển sang completed lần đầu => tạo bản ghi doanh thu (payment)
         if ($oldStatus !== 'completed' && $order->status === 'completed' && $order->total_price > 0) {
             Payment::create([
                 'order_id' => $order->id,
-                'method' => 'cash',
+                'method' => request('payment_method', 'cash'),
                 'amount' => $order->total_price,
             ]);
         }

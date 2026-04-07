@@ -1,4 +1,4 @@
-﻿import { Avatar, Dropdown, Space, Switch } from "antd";
+import { Avatar, Dropdown, Space, Switch, Button } from "antd";
 import {
     UserOutlined,
     LogoutOutlined,
@@ -56,6 +56,9 @@ export default function Header({ onLogout, darkMode, toggleTheme }) {
                         </div>
                     </Space>
                 </Dropdown>
+                <Button type="text" icon={<LogoutOutlined />} onClick={onLogout}>
+                    Đăng xuất
+                </Button>
             </Space>
         </div>
     );

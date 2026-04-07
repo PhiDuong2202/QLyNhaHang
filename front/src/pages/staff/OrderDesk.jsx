@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Badge,
   Button,
@@ -11,6 +11,7 @@ import {
   Space,
   Typography,
   message,
+  Spin,
 } from "antd";
 import {
   SearchOutlined,
@@ -34,6 +35,7 @@ export default function OrderDesk() {
   const cachedCategories = useMemo(() => api.readCachedData({ url: "/categories" }) || [], []);
 
   const [loading, setLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
   const [products, setProducts] = useState(cachedProducts);
   const [tables, setTables] = useState(cachedTables);
   const [categories, setCategories] = useState(cachedCategories);
@@ -61,6 +63,8 @@ export default function OrderDesk() {
       if (!silent) {
         message.error("Không tải được dữ liệu đặt đơn");
       }
+    } finally {
+      setIsFetching(false);
     }
   };
 
@@ -254,8 +258,14 @@ export default function OrderDesk() {
                 );
               })}
 
-              {filteredProducts.length === 0 && (
-                <div style={{ width: "100%" }}>
+              {isFetching && (
+                <div style={{ width: "100%", textAlign: "center", padding: "40px 0", gridColumn: "1 / -1" }}>
+                  <Spin size="large" tip="Đang tải dữ liệu..." />
+                </div>
+              )}
+
+              {!isFetching && filteredProducts.length === 0 && (
+                <div style={{ width: "100%", gridColumn: "1 / -1" }}>
                   <Empty description="Không có món phù hợp" />
                 </div>
               )}
