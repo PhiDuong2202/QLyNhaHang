@@ -146,7 +146,10 @@ export default function Home() {
             </div>
 
             <Row gutter={[30, 30]}>
-              {filteredProducts.map(p => (
+              {filteredProducts.map(p => {
+                const firstImg = p.images?.[0];
+                const imgUrl = firstImg ? (firstImg.url || `http://localhost:8000/storage/${firstImg.image_url}`) : null;
+                return (
                 <Col xs={24} sm={12} md={8} lg={6} key={p.id}>
                   <Badge.Ribbon text={p.category?.name || "Món ăn"} color="#10b981" style={{ fontSize: "12px", fontWeight: 600, top: 12 }}>
                     <Card
@@ -165,8 +168,8 @@ export default function Home() {
                       bodyStyle={{ flex: 1, display: "flex", flexDirection: "column", padding: "24px" }}
                       cover={
                         <div className="card-image-wrapper" style={{ height: 220, background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                          {p.image_url ? (
-                            <img alt={p.name} src={p.image_url} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.5s ease" }} className="card-img" />
+                          {imgUrl ? (
+                            <img alt={p.name} src={imgUrl} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.5s ease" }} className="card-img" />
                           ) : (
                             <span style={{ color: "#cbd5e1", fontSize: "60px" }}>🍽️</span>
                           )}
@@ -198,7 +201,8 @@ export default function Home() {
                     </Card>
                   </Badge.Ribbon>
                 </Col>
-              ))}
+              );
+              })}
             </Row>
 
             {filteredProducts.length === 0 && !loading && (

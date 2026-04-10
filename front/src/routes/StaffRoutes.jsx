@@ -4,14 +4,16 @@ import RoleRoute from "./RoleRoute";
 import StaffLayout from "../layouts/StaffLayout";
 import OrderDesk from "../pages/staff/OrderDesk";
 import StaffOrders from "../pages/staff/StaffOrders";
+import StaffLogin from "../pages/staff/StaffLogin";
 
 export default function StaffRoutes() {
   return (
     <Routes>
+      <Route path="login" element={<StaffLogin />} />
       <Route
         element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={[2]} redirectTo="/admin">
+          <ProtectedRoute loginPath="/staff/login">
+            <RoleRoute allowedRoles={[2]} redirectTo="/staff/login">
               <StaffLayout />
             </RoleRoute>
           </ProtectedRoute>

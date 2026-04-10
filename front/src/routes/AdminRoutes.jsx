@@ -11,14 +11,16 @@ import Revenue from "../pages/admin/Revenue";
 import Users from "../pages/admin/Users";
 import ProtectedRoute from "./ProtectedRoute";
 import RoleRoute from "./RoleRoute";
+import AdminLogin from "../pages/admin/AdminLogin";
 
 export default function AdminRoutes() {
   return (
     <Routes>
+      <Route path="login" element={<AdminLogin />} />
       <Route
         element={
-          <ProtectedRoute>
-            <RoleRoute allowedRoles={[1]} redirectTo="/staff">
+          <ProtectedRoute loginPath="/admin/login">
+            <RoleRoute allowedRoles={[1]} redirectTo="/admin/login">
               <AdminLayout />
             </RoleRoute>
           </ProtectedRoute>
