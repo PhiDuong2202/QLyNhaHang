@@ -5,12 +5,18 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Review;
+use App\Models\Product;
 
 class ReviewController extends Controller
 {
     public function index()
     {
         return Review::with('product')->latest()->get();
+    }
+
+    public function getProductReviews(Product $product)
+    {
+        return $product->reviews()->latest()->get();
     }
 
     public function store(Request $request)

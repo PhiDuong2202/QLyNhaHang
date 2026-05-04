@@ -24,6 +24,7 @@ Route::apiResource('products', ProductController::class)->only(['index','show'])
 Route::apiResource('product-images', ProductImageController::class)->only(['index']);
 
 Route::apiResource('reviews', ReviewController::class)->only(['index','store']);
+Route::get('/products/{product}/reviews', [ReviewController::class, 'getProductReviews']);
 
 
 Route::middleware('auth:sanctum')->group(function () {

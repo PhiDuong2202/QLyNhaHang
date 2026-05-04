@@ -18,6 +18,10 @@ export default function Home() {
   const [reviewingProduct, setReviewingProduct] = useState(null);
   const [form] = Form.useForm();
 
+  const [isViewReviewsOpen, setIsViewReviewsOpen] = useState(false);
+  const [reviewsList, setReviewsList] = useState([]);
+  const [reviewingProductForView, setReviewingProductForView] = useState(null);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -54,10 +58,29 @@ export default function Home() {
       });
       message.success("Cảm ơn bạn đã đánh giá món ăn!");
       setIsReviewOpen(false);
+      fetchData();
     } catch (err) {
       console.log(err);
       message.error("Đã xảy ra lỗi, vui lòng thử lại sau.");
     }
+  };
+
+  const fetchReviews = async (product) => {
+    try {
+      const res = await api.get(`/products/${product.id}/reviews`);
+      setReviewsList(res.data);
+      setReviewingProductForView(product);
+      setIsViewReviewsOpen(true);
+    } catch (err) {
+      console.log(err);
+      message.error("Lỗi khi tải đánh giá");
+    }
+  };
+
+  const calculateAverageRating = (reviews) => {
+    if (reviews.length === 0) return 0;
+    const sum = reviews.reduce((acc, review) => acc + review.rating, 0);
+    return (sum / reviews.length).toFixed(1);
   };
 
   const filteredProducts = products.filter(p =>
@@ -93,13 +116,9 @@ export default function Home() {
               FOOD<span style={{ color: "#e11d48" }}>HOLIC</span>
             </Title>
           </div>
-          <div>
-            {/* Admin login button removed for cleaner UI */}
-          </div>
         </Header>
 
         <Content style={{ background: "#f8fafc", paddingTop: "64px" }}>
-          {/* Hero Section */}
           <div style={{
             position: "relative",
             background: "linear-gradient(120deg, #0f172a 0%, #1e293b 100%)",
@@ -108,7 +127,6 @@ export default function Home() {
             color: "white",
             overflow: "hidden"
           }}>
-            {/* Decorative elements */}
             <div style={{ position: "absolute", top: "-50px", left: "-50px", width: "200px", height: "200px", borderRadius: "50%", background: "rgba(225, 29, 72, 0.15)", filter: "blur(40px)" }} />
             <div style={{ position: "absolute", bottom: "-100px", right: "-50px", width: "300px", height: "300px", borderRadius: "50%", background: "rgba(56, 189, 248, 0.1)", filter: "blur(50px)" }} />
 
@@ -148,60 +166,78 @@ export default function Home() {
             <Row gutter={[30, 30]}>
               {filteredProducts.map(p => {
                 const firstImg = p.images?.[0];
+                const avgRating = calculateAverageRating(p.reviews || []);
+                const reviewCount = p.reviews?.length || 0;
                 const imgUrl = firstImg ? (firstImg.url || `http://localhost:8000/storage/${firstImg.image_url}`) : null;
                 return (
-                <Col xs={24} sm={12} md={8} lg={6} key={p.id}>
-                  <Badge.Ribbon text={p.category?.name || "Món ăn"} color="#10b981" style={{ fontSize: "12px", fontWeight: 600, top: 12 }}>
-                    <Card
-                      hoverable
-                      className="product-card"
-                      style={{
-                        borderRadius: 16,
-                        overflow: "hidden",
-                        height: "100%",
-                        display: "flex",
-                        flexDirection: "column",
-                        border: "none",
-                        boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01)",
-                        transition: "all 0.3s ease"
-                      }}
-                      bodyStyle={{ flex: 1, display: "flex", flexDirection: "column", padding: "24px" }}
-                      cover={
-                        <div className="card-image-wrapper" style={{ height: 220, background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                          {imgUrl ? (
-                            <img alt={p.name} src={imgUrl} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.5s ease" }} className="card-img" />
-                          ) : (
-                            <span style={{ color: "#cbd5e1", fontSize: "60px" }}>🍽️</span>
-                          )}
-                        </div>
-                      }
-                    >
-                      <Meta
-                        title={<span style={{ fontSize: "18px", fontWeight: 700, color: "#1e293b", whiteSpace: "normal", lineHeight: 1.4 }}>{p.name}</span>}
-                        description={
-                          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12, flex: 1 }}>
-                            <div style={{ color: "#e11d48", fontWeight: 800, fontSize: "20px" }}>
-                              {Number(p.price).toLocaleString("vi-VN")} <span style={{ fontSize: "14px", fontWeight: 600 }}>VNĐ</span>
-                            </div>
-                            <div style={{ flex: 1, color: "#64748b", fontSize: "14px", lineHeight: 1.6 }}>
-                              {p.description || "Hương vị đậm đà, thơm ngon khó cưỡng. Được chế biến từ những nguyên liệu tươi ngon nhất."}
-                            </div>
+                  <Col xs={24} sm={12} md={12} lg={8} key={p.id}>
+                    <Badge.Ribbon text={p.category?.name || "Món ăn"} color="#10b981" style={{ fontSize: "12px", fontWeight: 600, top: 12 }}>
+                      <Card
+                        hoverable
+                        className="product-card"
+                        style={{
+                          borderRadius: 16,
+                          overflow: "hidden",
+                          height: "100%",
+                          display: "flex",
+                          flexDirection: "column",
+                          border: "none",
+                          boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01)",
+                          transition: "all 0.3s ease"
+                        }}
+                        bodyStyle={{ flex: 1, display: "flex", flexDirection: "column", padding: "24px" }}
+                        cover={
+                          <div className="card-image-wrapper" style={{ height: 220, background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                            {imgUrl ? (
+                              <img alt={p.name} src={imgUrl} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.5s ease" }} className="card-img" />
+                            ) : (
+                              <span style={{ color: "#cbd5e1", fontSize: "60px" }}>🍽️</span>
+                            )}
                           </div>
                         }
-                      />
-                      <Button
-                        type="dashed"
-                        onClick={() => openReview(p)}
-                        style={{ marginTop: 24, width: "100%", height: "40px", borderRadius: "8px", fontWeight: 600, borderColor: "#cbd5e1", color: "#475569" }}
-                        icon={<StarFilled style={{ color: "#fbbf24" }} />}
-                        className="review-btn"
                       >
-                        Đánh giá
-                      </Button>
-                    </Card>
-                  </Badge.Ribbon>
-                </Col>
-              );
+                        <Meta
+                          title={<span style={{ fontSize: "18px", fontWeight: 700, color: "#1e293b", whiteSpace: "normal", lineHeight: 1.4 }}>{p.name}</span>}
+                          description={
+                            <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12, flex: 1 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between" }}>
+                                <div style={{ color: "#e11d48", fontWeight: 800, fontSize: "20px" }}>
+                                  {Number(p.price).toLocaleString("vi-VN")} <span style={{ fontSize: "14px", fontWeight: 600 }}>VNĐ</span>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                  <Rate disabled value={Math.round(calculateAverageRating(p.reviews || []))} style={{ fontSize: 16, color: "#fbbf24" }} />
+                                  <span style={{ fontWeight: 600, color: "#64748b", fontSize: "14px" }}>({p.reviews?.length || 0})</span>
+                                </div>
+                              </div>
+                              <div style={{ flex: 1, color: "#64748b", fontSize: "14px", lineHeight: 1.6 }}>
+                                {p.description || "Hương vị đậm đà, thơm ngon khó cưỡng. Được chế biến từ những nguyên liệu tươi ngon nhất."}
+                              </div>
+                            </div>
+                          }
+                        />
+                        <div style={{ marginTop: 24, display: "flex", gap: 12 }}>
+                          <Button
+                            type="primary"
+                            onClick={() => fetchReviews(p)}
+                            style={{ flex: 1, height: "40px", borderRadius: "8px", fontWeight: 600 }}
+                            className="view-reviews-btn"
+                          >
+                            Xem Đánh Giá
+                          </Button>
+                          <Button
+                            type="dashed"
+                            onClick={() => openReview(p)}
+                            style={{ flex: 1, height: "40px", borderRadius: "8px", fontWeight: 600, borderColor: "#cbd5e1", color: "#475569" }}
+                            icon={<StarFilled style={{ color: "#fbbf24" }} />}
+                            className="review-btn"
+                          >
+                            Đánh giá
+                          </Button>
+                        </div>
+                      </Card>
+                    </Badge.Ribbon>
+                  </Col>
+                );
               })}
             </Row>
 
@@ -251,7 +287,7 @@ export default function Home() {
             </div>
           </div>
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", marginTop: 60, paddingTop: 30, textAlign: "center", fontSize: "14px" }}>
-            © {new Date().getFullYear()} Bản quyền thuộc về Foodholic. Thiết kế với <HeartFilled style={{ color: "#e11d48" }} />
+            © {new Date().getFullYear()} Bản quyền thuộc về Nguyễn Phi Dương. Thiết kế với <HeartFilled style={{ color: "#e11d48" }} />
           </div>
         </Footer>
 
@@ -294,6 +330,64 @@ export default function Home() {
               </Button>
             </Form.Item>
           </Form>
+        </Modal>
+
+        <Modal
+          title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ background: "#fef3c7", padding: "8px", borderRadius: "50%", display: "flex" }}>
+                <StarFilled style={{ color: "#f59e0b", fontSize: 20 }} />
+              </div>
+              <span style={{ fontSize: "18px", fontWeight: 700, color: "#1e293b" }}>Đánh giá: {reviewingProductForView?.name}</span>
+            </div>
+          }
+          open={isViewReviewsOpen}
+          onCancel={() => setIsViewReviewsOpen(false)}
+          footer={null}
+          centered
+          className="view-reviews-modal"
+          width={600}
+          styles={{
+            mask: { backdropFilter: "blur(4px)" },
+            content: { borderRadius: "20px", padding: "24px" }
+          }}
+        >
+          <div style={{ marginTop: 24 }}>
+            {reviewsList.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16, maxHeight: "500px", overflowY: "auto" }}>
+                {reviewsList.map((review, idx) => (
+                  <div key={idx} style={{
+                    padding: "16px",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "12px",
+                    background: "#f8fafc",
+                    transition: "all 0.3s ease"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+                      <div>
+                        <div style={{ fontWeight: 700, color: "#1e293b", fontSize: "16px" }}>{review.customer_name}</div>
+                        <div style={{ color: "#94a3b8", fontSize: "13px", marginTop: "4px" }}>
+                          {new Date(review.created_at).toLocaleDateString('vi-VN')}
+                        </div>
+                      </div>
+                      <Rate disabled value={review.rating} style={{ fontSize: 16, color: "#fbbf24" }} />
+                    </div>
+                    {review.comment && (
+                      <div style={{ color: "#475569", fontSize: "14px", lineHeight: 1.6, marginTop: "12px", fontStyle: "italic" }}>
+                        "{review.comment}"
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ textAlign: "center", padding: "40px 20px", color: "#94a3b8" }}>
+                <span style={{ fontSize: "40px", display: "block", marginBottom: "12px" }}>📝</span>
+                <div style={{ fontSize: "16px", fontWeight: 600 }}>Chưa có đánh giá nào</div>
+                <div style={{ fontSize: "14px", marginTop: "8px" }}>Hãy là người đầu tiên đánh giá món ăn này!</div>
+              </div>
+            )}
+          </div>
         </Modal>
 
         <style>{`

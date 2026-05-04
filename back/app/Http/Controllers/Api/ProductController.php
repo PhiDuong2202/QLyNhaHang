@@ -14,7 +14,7 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::with('category', 'images');
+        $query = Product::with('category', 'images', 'reviews');
 
         if ($request->filled('category_id')) {
             $query->where('category_id', $request->category_id);
@@ -58,7 +58,7 @@ class ProductController extends Controller
 
     public function show($id)
     {
-        return Product::with('category', 'images')->findOrFail($id);
+        return Product::with('category', 'images', 'reviews')->findOrFail($id);
     }
 
     public function update(Request $request, $id)
