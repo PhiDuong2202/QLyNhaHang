@@ -10,12 +10,16 @@ class CustomerController extends Controller
 {
     public function index()
     {
-        return Customer::latest()->get();
+        return Customer::with(['orders' => function($q) {
+            $q->with('orderItems.product', 'payments')->latest();
+        }])->latest()->get();
     }
 
     public function show($id)
     {
-        return Customer::findOrFail($id);
+        return Customer::with(['orders' => function($q) {
+            $q->with('orderItems.product', 'payments')->latest();
+        }])->findOrFail($id);
     }
 
     public function store(Request $request)

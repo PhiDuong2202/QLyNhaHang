@@ -10,17 +10,19 @@ class TableController extends Controller
 {
     public function index()
     {
-        return Table::all();
+        return Table::orderBy('sort_order')->orderBy('id')->get();
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
             'name' => 'required',
-            'status' => 'required'
+            'status' => 'required',
+            'seats' => 'nullable|integer|min:1',
+            'sort_order' => 'nullable|integer',
         ]);
 
-        return Table::create($data);
+        return Table::create(array_merge(['sort_order' => 0], $data));
     }
 
     public function update(Request $request, $id)

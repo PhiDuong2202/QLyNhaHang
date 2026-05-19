@@ -12,15 +12,19 @@ import {
   Typography,
   message,
   Spin,
+  Card,
+  Divider,
 } from "antd";
 import {
   SearchOutlined,
   PlusOutlined,
   DeleteOutlined,
   ShoppingCartOutlined,
+  ArrowLeftOutlined,
 } from "@ant-design/icons";
 import api from "../../services/api";
 import useDarkMode from "../../hooks/useDarkMode";
+import TableSelection from "../../components/TableSelection";
 
 const { Text } = Typography;
 
@@ -33,31 +37,43 @@ export default function OrderDesk() {
   const cachedProducts = useMemo(() => api.readCachedData({ url: "/products" }) || [], []);
   const cachedTables = useMemo(() => api.readCachedData({ url: "/tables" }) || [], []);
   const cachedCategories = useMemo(() => api.readCachedData({ url: "/categories" }) || [], []);
+  const cachedCustomers = useMemo(() => api.readCachedData({ url: "/customers" }) || [], []);
 
   const [loading, setLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [products, setProducts] = useState(cachedProducts);
   const [tables, setTables] = useState(cachedTables);
   const [categories, setCategories] = useState(cachedCategories);
+  const [customers, setCustomers] = useState(cachedCustomers);
+  const [orders, setOrders] = useState([]);
 
   const [selectedTable, setSelectedTable] = useState();
+  const [currentOrderId, setCurrentOrderId] = useState(null);
   const [orderType, setOrderType] = useState("dine_in");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [existingCustomerId, setExistingCustomerId] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [keyword, setKeyword] = useState("");
   const [cart, setCart] = useState([]);
 
   const loadData = async ({ silent = false } = {}) => {
     try {
-      const [productsRes, tablesRes, categoriesRes] = await Promise.all([
+      const [productsRes, tablesRes, categoriesRes, customersRes, ordersRes] = await Promise.all([
         api.get("/products"),
         api.get("/tables"),
         api.get("/categories"),
+        api.get("/customers"),
+        api.get("/orders"),
       ]);
       setProducts(Array.isArray(productsRes.data) ? productsRes.data : []);
       setTables(Array.isArray(tablesRes.data) ? tablesRes.data : []);
       setCategories(Array.isArray(categoriesRes.data) ? categoriesRes.data : []);
+      setCustomers(Array.isArray(customersRes.data) ? customersRes.data : []);
+      
+      const ordersData = Array.isArray(ordersRes.data) ? ordersRes.data : [];
+      console.log("Loaded orders from API:", ordersData);
+      setOrders(ordersData);
     } catch (err) {
       console.log(err);
       if (!silent) {
@@ -78,6 +94,94 @@ export default function OrderDesk() {
       setSelectedTable(undefined);
     }
   }, [orderType]);
+
+  // Load order items when table selection changes
+  useEffect(() => {
+    if (selectedTable && orderType === "dine_in") {
+      // Find existing order for this table with pending/processing status
+      console.log("All orders:", orders);
+      console.log("Looking for table:", selectedTable, "type:", typeof selectedTable);
+      
+      const existingOrder = orders.find(
+        (o) => {
+          const tableMatch = Number(o.table_id) === Number(selectedTable);
+          const statusMatch = o.status && (
+            o.status === "pending" || 
+            o.status === "processing" || 
+            o.status === "Đang chờ" ||
+            o.status === "Đang làm"
+          );
+          console.log(`Order ${o.id}: table_id=${o.table_id} (${typeof o.table_id}), status='${o.status}', tableMatch=${tableMatch}, statusMatch=${statusMatch}`);
+          return tableMatch && statusMatch;
+        }
+      );
+
+      console.log("selectedTable:", selectedTable, "existingOrder found:", existingOrder?.id || "none");
+
+      if (existingOrder && existingOrder.orderItems) {
+        // Load order items into cart
+        console.log("Loading order items:", existingOrder.orderItems);
+        const items = existingOrder.orderItems.map((item) => ({
+          key: item.product_id,
+          product_id: item.product_id,
+          name: item.product?.name || `Product ${item.product_id}`,
+          price: Number(item.price || 0),
+          quantity: item.quantity,
+          order_item_id: item.id, // Track original order item for update
+        }));
+        setCart(items);
+        setCurrentOrderId(existingOrder.id);
+
+        // Load customer info if exists
+        if (existingOrder.customer) {
+          console.log("Loading customer:", existingOrder.customer);
+          setCustomerName(existingOrder.customer.name || "");
+          setCustomerPhone(existingOrder.customer.phone || "");
+          setExistingCustomerId(existingOrder.customer.id);
+        }
+      } else {
+        // New order - clear everything
+        console.log("No existing order found, clearing cart");
+        setCart([]);
+        setCurrentOrderId(null);
+        setCustomerName("");
+        setCustomerPhone("");
+        setExistingCustomerId(null);
+      }
+    } else if (!selectedTable && orderType === "dine_in") {
+
+      setCart([]);
+      setCurrentOrderId(null);
+      setCustomerName("");
+      setCustomerPhone("");
+      setExistingCustomerId(null);
+    }
+  }, [selectedTable, orderType, orders]);
+
+  const handlePhoneChange = (value) => {
+    const phone = value.trim();
+    setCustomerPhone(phone);
+
+    if (!phone) {
+      setExistingCustomerId(null);
+      setCustomerName("");
+      return;
+    }
+
+    const found = customers.find(
+      (customer) => customer.phone && customer.phone.trim() === phone
+    );
+
+    if (found) {
+      setExistingCustomerId(found.id);
+      setCustomerName(found.name || "");
+    } else {
+      setExistingCustomerId(null);
+      if (!customerName) {
+        setCustomerName("");
+      }
+    }
+  };
 
   const filteredProducts = useMemo(() => {
     const q = keyword.trim().toLowerCase();
@@ -148,43 +252,125 @@ export default function OrderDesk() {
 
     setLoading(true);
     try {
-      let customerId = null;
-      if (customerName.trim()) {
-        const customerRes = await api.post("/customers", {
-          name: customerName.trim(),
-          phone: customerPhone.trim() || null,
+      // If updating existing order
+      if (currentOrderId) {
+        // Get original order items
+        const originalOrder = orders.find((o) => o.id === currentOrderId);
+        const originalItems = originalOrder?.orderItems || [];
+
+        // Items to delete: exist in original but not in current cart
+        const itemIdsToKeep = cart
+          .filter((item) => item.order_item_id)
+          .map((item) => item.order_item_id);
+
+        const itemsToDelete = originalItems.filter(
+          (item) => !itemIdsToKeep.includes(item.id)
+        );
+
+        await Promise.all(
+          itemsToDelete.map((item) =>
+            api.delete(`/order-items/${item.id}`)
+          )
+        );
+
+        await Promise.all(
+          cart.map((item) => {
+            if (item.order_item_id) {
+              return api.put(`/order-items/${item.order_item_id}`, {
+                quantity: item.quantity,
+              });
+            } else {
+              return api.post("/order-items", {
+                order_id: currentOrderId,
+                product_id: item.product_id,
+                quantity: item.quantity,
+              });
+            }
+          })
+        );
+
+        const customerId = existingCustomerId || (customerName.trim() || customerPhone.trim() ? 
+          (await api.post("/customers", {
+            name: customerName.trim() || null,
+            phone: customerPhone.trim() || null,
+          })).data?.id : null);
+
+        const newTotal = cart.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0
+        );
+
+        await api.put(`/orders/${currentOrderId}`, {
+          total_price: newTotal,
+          customer_id: customerId,
         });
-        customerId = customerRes.data?.id ?? null;
+
+        message.success("Cập nhật đơn hàng thành công");
+        
+        setCart([]);
+        loadData({ silent: true });
+      } else {
+        let customerId = null;
+        if (customerName.trim()) {
+          const customerRes = await api.post("/customers", {
+            name: customerName.trim(),
+            phone: customerPhone.trim() || null,
+          });
+          customerId = customerRes.data?.id ?? null;
+        }
+
+        if (!existingCustomerId && customerPhone.trim() && !customerName.trim()) {
+          message.warning("Vui lòng nhập tên khách hàng mới nếu số điện thoại chưa có trong hệ thống");
+          setLoading(false);
+          return;
+        }
+
+        if (!existingCustomerId && customerPhone.trim()) {
+          const customersRes = await api.post("/customers", {
+            name: customerName.trim() || null,
+            phone: customerPhone.trim(),
+          });
+          customerId = customersRes.data?.id ?? null;
+        } else if (existingCustomerId) {
+          customerId = existingCustomerId;
+        } else if (customerName.trim()) {
+          const customersRes = await api.post("/customers", {
+            name: customerName.trim(),
+            phone: customerPhone.trim() || null,
+          });
+          customerId = customersRes.data?.id ?? null;
+        }
+
+        const orderPayload = {
+          order_type: orderType,
+          total_price: total,
+          status: "pending",
+          ...(customerId ? { customer_id: customerId } : {}),
+          ...(requiresTable ? { table_id: selectedTable } : {}),
+        };
+
+        const orderRes = await api.post("/orders", orderPayload);
+
+        const orderId = orderRes.data?.id;
+        
+        await Promise.all(
+          cart.map((item) =>
+            api.post("/order-items", {
+              order_id: orderId,
+              product_id: item.product_id,
+              quantity: item.quantity,
+            })
+          )
+        );
+
+        message.success("Tạo đơn thành công");
+        
+        setCurrentOrderId(orderId);
+        setCart([]);
+        
+        loadData({ silent: true });
       }
 
-      const orderPayload = {
-        order_type: orderType,
-        total_price: total,
-        status: "pending",
-        ...(customerId ? { customer_id: customerId } : {}),
-        ...(requiresTable ? { table_id: selectedTable } : {}),
-      };
-
-      const orderRes = await api.post("/orders", orderPayload);
-
-      const orderId = orderRes.data?.id;
-      await Promise.all(
-        cart.map((item) =>
-          api.post("/order-items", {
-            order_id: orderId,
-            product_id: item.product_id,
-            quantity: item.quantity,
-          })
-        )
-      );
-
-      message.success("Tạo đơn thành công");
-      setCart([]);
-      setCustomerName("");
-      setCustomerPhone("");
-      setOrderType("dine_in");
-      setSelectedTable(undefined);
-      loadData({ silent: true });
     } catch (err) {
       console.log(err);
       const msg = err?.response?.data?.message;
@@ -194,8 +380,41 @@ export default function OrderDesk() {
     }
   };
 
+  const requiresTable = orderType !== "take_away";
+
+  if (requiresTable && !selectedTable) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.tableSelectionContainer}>
+          <TableSelection
+            tables={tables}
+            selectedTable={selectedTable}
+            onSelectTable={setSelectedTable}
+            loading={isFetching}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.page}>
+      {selectedTable && requiresTable && (
+        <div style={styles.breadcrumb}>
+          <Button
+            type="text"
+            icon={<ArrowLeftOutlined />}
+            onClick={() => {
+              setSelectedTable(undefined);
+            }}
+          >
+            Chọn bàn khác
+          </Button>
+          <span style={{ color: "inherit", marginLeft: 8 }}>
+            Bàn: <strong>{tables.find((t) => t.id === selectedTable)?.name || `Bàn ${selectedTable}`}</strong>
+          </span>
+        </div>
+      )}
       <Row gutter={12} style={{ margin: 0 }}>
         <Col xs={24} lg={14} style={{ paddingLeft: 0 }}>
           <div style={styles.leftPane}>
@@ -293,27 +512,28 @@ export default function OrderDesk() {
                   { value: "preorder", label: "Khách đặt" },
                 ]}
               />
-              <Select
-                value={selectedTable}
-                placeholder={orderType === "take_away" ? "Mang về không cần chọn bàn" : "Chọn bàn"}
-                onChange={setSelectedTable}
-                disabled={orderType === "take_away"}
-                allowClear
-                options={tables.map((t) => ({
-                  value: t.id,
-                  label: t.name || `Bàn ${t.id}`,
-                }))}
+              {requiresTable && selectedTable ? (
+                <div style={styles.fixedTableInfo}>
+                  <strong>Bàn hiện tại:</strong>{" "}
+                  {tables.find((t) => t.id === selectedTable)?.name || `Bàn ${selectedTable}`}
+                </div>
+              ) : null}
+              <Input
+                value={customerPhone}
+                onChange={(e) => handlePhoneChange(e.target.value)}
+                placeholder="SĐT khách"
               />
               <Input
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 placeholder="Tên khách"
+                disabled={!!existingCustomerId}
               />
-              <Input
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                placeholder="SĐT khách"
-              />
+              {!!existingCustomerId && (
+                <div style={styles.customerNote}>
+                  Khách hàng: <strong>{customerName}</strong>
+                </div>
+              )}
             </div>
 
             <div style={styles.cartList}>
@@ -354,7 +574,7 @@ export default function OrderDesk() {
                 onClick={submitOrder}
                 block
               >
-                Tạo đơn
+                {currentOrderId ? "Cập nhật đơn" : "Tạo đơn"}
               </Button>
             </div>
           </div>
@@ -368,6 +588,24 @@ function createStyles(darkMode) {
   return {
     page: {
       minHeight: "calc(100vh - 180px)",
+    },
+    tableSelectionContainer: {
+      padding: 12,
+      minHeight: "calc(100vh - 180px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    breadcrumb: {
+      marginBottom: 12,
+      padding: 12,
+      borderRadius: 8,
+      background: darkMode ? "#0b1220" : "#f0f7ff",
+      border: darkMode ? "1px solid #1f2a44" : "1px solid #b6e3ff",
+      color: darkMode ? "#e2e8f0" : "#0f172a",
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
     },
     leftPane: {
       borderRadius: 10,
@@ -468,6 +706,22 @@ function createStyles(darkMode) {
       gap: 8,
       padding: 12,
       borderBottom: darkMode ? "1px solid #25314d" : "1px solid #e2e8f0",
+    },
+    fixedTableInfo: {
+      padding: "10px 12px",
+      borderRadius: 10,
+      background: darkMode ? "#0f172a" : "#f8fafc",
+      border: darkMode ? "1px solid #25314d" : "1px solid #e2e8f0",
+      color: darkMode ? "#e2e8f0" : "#0f172a",
+      fontWeight: 600,
+    },
+    customerNote: {
+      padding: "10px 12px",
+      borderRadius: 10,
+      background: darkMode ? "#111827" : "#f1f5f9",
+      color: darkMode ? "#60a5fa" : "#2563eb",
+      border: darkMode ? "1px solid #1e293b" : "1px solid #dbe4ef",
+      fontSize: 13,
     },
     cartList: {
       flex: 1,

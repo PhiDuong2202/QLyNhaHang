@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState } from "react";
+import { message } from "antd";
 import api from "../../services/api";
 import AdminTable from "../../components/AdminTable";
 import AdminForm from "../../components/AdminForm";
@@ -64,7 +65,7 @@ export default function Orders() {
     try {
       const requiresTable = (data.order_type || "dine_in") !== "take_away";
       if (requiresTable && !data.table_id) {
-        alert("Vui lòng chọn bàn.");
+        message.warning("Vui lòng chọn bàn.");
         return;
       }
 
@@ -87,10 +88,10 @@ export default function Orders() {
 
       if (editing) {
         await api.put(`/orders/${editing.id}`, payload);
-        alert("Cập nhật đơn hàng thành công");
+        message.success("Cập nhật đơn hàng thành công");
       } else {
         await api.post("/orders", payload);
-        alert("Thêm đơn hàng thành công");
+        message.success("Thêm đơn hàng thành công");
       }
 
       setShowForm(false);
@@ -103,7 +104,7 @@ export default function Orders() {
         (typeof err.response?.data === "string"
           ? err.response.data
           : "Không lưu được đơn hàng, vui lòng kiểm tra lại dữ liệu.");
-      alert(msg);
+      message.error(msg);
     }
   };
 

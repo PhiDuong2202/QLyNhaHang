@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect } from "react";
+import { message } from "antd";
 import api from "../../services/api";
 import AdminTable from "../../components/AdminTable";
 import AdminForm from "../../components/AdminForm";
@@ -55,7 +56,7 @@ export default function Products() {
         const isDuplicate = products.some((p) => p.name.trim().toLowerCase() === nameTrimmed);
 
         if (isDuplicate) {
-          alert("Sản phẩm với tên này đã tồn tại trong danh mục đang chọn.");
+          message.warning("Sản phẩm với tên này đã tồn tại trong danh mục đang chọn.");
           return;
         }
       }
@@ -77,7 +78,7 @@ export default function Products() {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         });
-        alert("Cập nhật thành công");
+        message.success("Cập nhật thành công");
       } else {
         await axios.post("http://localhost:8000/api/products", formData, {
           headers: {
@@ -85,7 +86,7 @@ export default function Products() {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         });
-        alert("Thêm thành công");
+        message.success("Thêm thành công");
       }
 
       setShowForm(false);

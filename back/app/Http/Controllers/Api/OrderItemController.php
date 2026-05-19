@@ -26,4 +26,23 @@ class OrderItemController extends Controller
             'price' => $product->price
         ]);
     }
+
+    public function update(Request $request, $id)
+    {
+        $orderItem = OrderItem::findOrFail($id);
+
+        $data = $request->validate([
+            'quantity' => 'required|numeric|min:1'
+        ]);
+
+        $orderItem->update($data);
+        return $orderItem;
+    }
+
+    public function destroy($id)
+    {
+        $orderItem = OrderItem::findOrFail($id);
+        $orderItem->delete();
+        return response()->noContent();
+    }
 }

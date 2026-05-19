@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { message } from "antd";
 import api from "../../services/api";
 import AdminTable from "../../components/AdminTable";
 import AdminForm from "../../components/AdminForm";
@@ -34,10 +35,10 @@ export default function Categories() {
     try {
       if (editing) {
         await api.put(`/categories/${editing.id}`, data);
-        alert("Cập nhật thành công");
+        message.success("Cập nhật thành công");
       } else {
         await api.post("/categories", data);
-        alert("Thêm thành công");
+        message.success("Thêm thành công");
       }
 
       fetchCategories();

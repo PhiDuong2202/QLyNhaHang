@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { message } from "antd";
 import api from "../../services/api";
-import AdminTable from "../../components/AdminTable";
 import AdminForm from "../../components/AdminForm";
 import Modal from "../../components/Modal";
 import useDarkMode from "../../hooks/useDarkMode";
@@ -11,11 +11,14 @@ export default function Tables() {
   const [tables, setTables] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [dragIndex, setDragIndex] = useState(null);
 
   const fetchTables = async () => {
     try {
       const res = await api.get("/tables");
-      setTables(res.data);
+      const tableList = Array.isArray(res.data) ? res.data : [];
+      tableList.sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
+      setTables(tableList);
     } catch (err) {
       console.log(err);
     }
@@ -27,6 +30,7 @@ export default function Tables() {
 
   const fields = [
     { label: "Tên bàn", name: "name" },
+    { label: "Số chỗ", name: "seats", type: "number" },
     {
       label: "Trạng thái",
       name: "status",
@@ -43,15 +47,16 @@ export default function Tables() {
     try {
       const payload = {
         name: data.name,
+        seats: Number(data.seats) || 4,
         status: data.status,
       };
 
       if (editing) {
         await api.put(`/tables/${editing.id}`, payload);
-        alert("Cập nhật bàn thành công");
+        message.success("Cập nhật bàn thành công");
       } else {
         await api.post("/tables", payload);
-        alert("Thêm bàn thành công");
+        message.success("Thêm bàn thành công");
       }
 
       setShowForm(false);
@@ -68,29 +73,51 @@ export default function Tables() {
     fetchTables();
   };
 
-  const columns = ["STT", "Tên", "Trạng thái", "Hành động"];
+  const updateTableOrder = async (newTables) => {
+    setTables(newTables);
+    await Promise.all(
+      newTables.map((table, index) =>
+        api.put(`/tables/${table.id}`, {
+          ...table,
+          sort_order: index + 1,
+        })
+      )
+    );
+  };
 
-  const tableData = tables.map((t, index) => ({
-    stt: index + 1,
-    name: t.name,
-    status: t.status === "available" ? "Trống" : t.status === "occupied" ? "Đang dùng" : t.status === "reserved" ? "Đã đặt trước" : t.status,
-    action: (
-      <div style={styles.actionGroup}>
-        <button
-          style={{ ...styles.actionBtn, ...styles.editBtn }}
-          onClick={() => {
-            setEditing(t);
-            setShowForm(true);
-          }}
-        >
-          Sửa
-        </button>
-        <button style={{ ...styles.actionBtn, ...styles.deleteBtn }} onClick={() => handleDelete(t.id)}>
-          Xóa
-        </button>
-      </div>
-    ),
-  }));
+  const [dropIndex, setDropIndex] = useState(null);
+
+  const handleDragStart = (index) => {
+    setDragIndex(index);
+    setDropIndex(index);
+  };
+
+  const handleDragOver = (index, event) => {
+    event.preventDefault();
+    setDropIndex(index);
+  };
+
+  const handleDrop = async () => {
+    if (dragIndex === null || dropIndex === null || dragIndex === dropIndex) {
+      setDragIndex(null);
+      setDropIndex(null);
+      return;
+    }
+
+    const newTables = [...tables];
+    const [moved] = newTables.splice(dragIndex, 1);
+    newTables.splice(dropIndex, 0, moved);
+    setDragIndex(null);
+    setDropIndex(null);
+    await updateTableOrder(newTables);
+  };
+
+  const statusLabel = (status) => {
+    if (status === "available" || status === "empty") return "Trống";
+    if (status === "occupied") return "Đang dùng";
+    if (status === "reserved") return "Đã đặt trước";
+    return status;
+  };
 
   return (
     <div>
@@ -114,6 +141,7 @@ export default function Tables() {
             initialData={
               editing || {
                 name: "",
+                seats: 4,
                 status: "available",
               }
             }
@@ -121,7 +149,55 @@ export default function Tables() {
         </Modal>
       )}
 
-      <AdminTable columns={columns} data={tableData} />
+      <div style={styles.tableWrapper}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.th}>STT</th>
+              <th style={styles.th}>Tên bàn</th>
+              <th style={styles.th}>Số chỗ</th>
+              <th style={styles.th}>Trạng thái</th>
+              <th style={styles.th}>Hành động</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tables.map((table, index) => (
+              <tr
+                key={table.id}
+                draggable
+                onDragStart={() => handleDragStart(index)}
+                onDragOver={(event) => handleDragOver(index, event)}
+                onDrop={handleDrop}
+                style={index % 2 === 0 ? styles.trEven : styles.trOdd}
+              >
+                <td style={styles.td}>{index + 1}</td>
+                <td style={styles.td}>{table.name}</td>
+                <td style={styles.td}>{table.seats || 4}</td>
+                <td style={styles.td}>{statusLabel(table.status)}</td>
+                <td style={styles.td}>
+                  <div style={styles.actionGroup}>
+                    <button
+                      style={{ ...styles.actionBtn, ...styles.editBtn }}
+                      onClick={() => {
+                        setEditing(table);
+                        setShowForm(true);
+                      }}
+                    >
+                      Sửa
+                    </button>
+                    <button
+                      style={{ ...styles.actionBtn, ...styles.deleteBtn }}
+                      onClick={() => handleDelete(table.id)}
+                    >
+                      Xóa
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -138,6 +214,46 @@ const getStyles = (isDarkMode) => ({
     fontWeight: 600,
     cursor: "pointer",
     boxShadow: isDarkMode ? "0 8px 18px rgba(37, 99, 235, 0.35)" : "0 8px 18px rgba(37, 99, 235, 0.2)",
+  },
+  tableWrapper: {
+    width: "100%",
+    overflowX: "auto",
+    borderRadius: 12,
+    border: isDarkMode ? "1px solid #334155" : "1px solid #e5e7eb",
+    background: isDarkMode ? "#111827" : "#fff",
+    boxShadow: isDarkMode ? "0 8px 20px rgba(2, 6, 23, 0.45)" : "0 8px 20px rgba(17, 24, 39, 0.06)",
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "separate",
+    borderSpacing: 0,
+    minWidth: 720,
+  },
+  th: {
+    position: "sticky",
+    top: 0,
+    zIndex: 1,
+    textAlign: "left",
+    padding: "14px 16px",
+    background: isDarkMode ? "#0f172a" : "#f8fafc",
+    color: isDarkMode ? "#e2e8f0" : "#334155",
+    fontWeight: 700,
+    fontSize: 14,
+    borderBottom: isDarkMode ? "1px solid #334155" : "1px solid #e5e7eb",
+    whiteSpace: "nowrap",
+  },
+  td: {
+    padding: "14px 16px",
+    borderBottom: isDarkMode ? "1px solid #1e293b" : "1px solid #eef2f7",
+    color: isDarkMode ? "#cbd5e1" : "#1f2937",
+    fontSize: 14,
+    verticalAlign: "middle",
+  },
+  trEven: {
+    background: isDarkMode ? "#111827" : "#ffffff",
+  },
+  trOdd: {
+    background: isDarkMode ? "#0b1220" : "#fcfdff",
   },
   actionGroup: { display: "flex", gap: 8 },
   actionBtn: {
