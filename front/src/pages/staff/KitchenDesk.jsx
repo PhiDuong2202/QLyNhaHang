@@ -35,6 +35,14 @@ export default function KitchenDesk() {
   const [tables, setTables] = useState([]);
   const [activeOrderToPrint, setActiveOrderToPrint] = useState(null);
 
+  // Filter orders to only show those that have at least one pending or cooking item
+  const activeKitchenOrders = useMemo(() => {
+    return orders.filter((order) => {
+      const items = order.order_items || order.orderItems || [];
+      return items.some((item) => item.status === "pending" || item.status === "cooking" || !item.status);
+    });
+  }, [orders]);
+
   // Load data from the consolidated sync endpoint
   const loadSyncData = async ({ silent = false } = {}) => {
     if (!silent) setIsFetching(true);
@@ -106,8 +114,9 @@ export default function KitchenDesk() {
   const updateAllItemsStatus = async (order, newStatus) => {
     setLoading(true);
     try {
+      const orderItems = order.order_items || order.orderItems || [];
       await Promise.all(
-        order.orderItems.map((item) =>
+        orderItems.map((item) =>
           api.put(`/order-items/${item.id}`, { status: newStatus })
         )
       );
@@ -356,18 +365,18 @@ export default function KitchenDesk() {
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "50vh" }} className="no-print">
           <Spin size="large" tip="Đang kết nối dữ liệu phòng bếp..." />
         </div>
-      ) : orders.length === 0 ? (
+      ) : activeKitchenOrders.length === 0 ? (
         <div style={{ background: darkMode ? "#111827" : "#fff", padding: "60px 0", borderRadius: 12 }} className="no-print">
           <Empty description="Không có đơn hàng nào cần chế biến" />
         </div>
       ) : (
         <Row gutter={[16, 16]} style={styles.grid} className="no-print">
-          {orders.map((order) => {
+          {activeKitchenOrders.map((order) => {
             const elapsed = getElapsedTime(order.created_at);
             const tableName = order.table?.name || "Khách mang về";
             
             // Check if there are items to make
-            const items = order.orderItems || [];
+            const items = order.order_items || order.orderItems || [];
             
             return (
               <Col key={order.id} xs={24} md={12} lg={8}>
@@ -523,7 +532,7 @@ export default function KitchenDesk() {
               </tr>
             </thead>
             <tbody>
-              {activeOrderToPrint.orderItems?.map((item) => (
+              {(activeOrderToPrint.order_items || activeOrderToPrint.orderItems)?.map((item) => (
                 <tr key={item.id} style={{ borderBottom: "1px dotted #000" }}>
                   <td style={{ fontSize: 13, padding: "4px 0" }}>
                     <strong>{item.product?.name}</strong>

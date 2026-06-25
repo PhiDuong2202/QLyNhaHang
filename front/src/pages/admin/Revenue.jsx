@@ -333,7 +333,7 @@ export default function Revenue() {
     let totalRev = 0;
 
     matchedOrders.forEach((o) => {
-      const items = o.orderItems || [];
+      const items = o.order_items || o.orderItems || [];
       items.forEach((item) => {
         const prod = item.product;
         if (!prod) return;

@@ -38,7 +38,7 @@ export default function StaffOrders() {
   }, []);
 
   const filteredOrders = orders.filter((o) => {
-    if (statusFilter === "active") return o.status === "pending" || o.status === "processing";
+    if (statusFilter === "active") return o.status !== "completed" && o.status !== "cancelled";
     if (statusFilter === "completed") return o.status === "completed";
     if (statusFilter === "cancelled") return o.status === "cancelled";
     return true;
@@ -102,9 +102,9 @@ export default function StaffOrders() {
           <Button size="small" onClick={() => setViewingOrder(record)}>
             Chi tiết
           </Button>
-          {(record.status === "pending" || record.status === "processing") && (
+          {record.status !== "completed" && record.status !== "cancelled" && (
             <>
-              {record.status === "pending" && (
+              {(record.status === "pending" || record.status === "open") && (
                 <Button size="small" onClick={() => changeStatus(record, "processing")}>
                   Nhận làm
                 </Button>

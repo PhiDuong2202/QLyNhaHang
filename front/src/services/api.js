@@ -36,7 +36,8 @@ api.interceptors.request.use((config) => {
   }
 
   const method = config.method?.toLowerCase();
-  if (method === "get" && !config.skipCache) {
+  const isSyncRoute = config.url?.includes("sync");
+  if (method === "get" && !config.skipCache && !isSyncRoute) {
     const key = buildCacheKey(config);
     const cached = responseCache.get(key);
 
@@ -58,8 +59,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => {
     const method = response.config?.method?.toLowerCase();
+    const isSyncRoute = response.config?.url?.includes("sync");
 
-    if (method === "get" && !response.config?.skipCache) {
+    if (method === "get" && !response.config?.skipCache && !isSyncRoute) {
       const key = buildCacheKey(response.config);
       responseCache.set(key, {
         data: response.data,
@@ -76,8 +78,9 @@ api.interceptors.response.use(
   (error) => {
     const config = error.config;
     const method = config?.method?.toLowerCase();
+    const isSyncRoute = config?.url?.includes("sync");
 
-    if (method === "get" && config && !config.skipCache) {
+    if (method === "get" && config && !config.skipCache && !isSyncRoute) {
       const key = buildCacheKey(config);
       const cached = responseCache.get(key);
 

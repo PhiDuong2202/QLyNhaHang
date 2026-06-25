@@ -153,6 +153,24 @@ export default function OrderDesk() {
     }
   }, [orderType]);
 
+  // Calculate capacity based on recipe ingredients stock
+  const getProductCapacity = (product) => {
+    if (!product.recipes || product.recipes.length === 0) return null; // Unlimited
+    
+    let minServings = Infinity;
+    product.recipes.forEach((r) => {
+      const amount = Number(r.amount);
+      const stock = Number(r.ingredient?.quantity ?? 0);
+      if (amount <= 0) return;
+      const servings = Math.floor(stock / amount);
+      if (servings < minServings) {
+        minServings = servings;
+      }
+    });
+    
+    return minServings === Infinity ? null : minServings;
+  };
+
   // Load order items when table selection changes
   useEffect(() => {
     if (selectedTable && orderType === "dine_in") {
@@ -162,21 +180,19 @@ export default function OrderDesk() {
       const existingOrder = orders.find(
         (o) => {
           const tableMatch = Number(o.table_id) === Number(selectedTable);
-          const statusMatch = o.status && (
-            o.status === "pending" || 
-            o.status === "processing" || 
-            o.status === "Đang chờ" ||
-            o.status === "Đang làm"
-          );
+          // Allow any order that is NOT completed or cancelled to load
+          const statusMatch = o.status && o.status !== "completed" && o.status !== "cancelled";
           return tableMatch && statusMatch;
         }
       );
 
       console.log("selectedTable:", selectedTable, "existingOrder found:", existingOrder?.id || "none");
 
-      if (existingOrder && existingOrder.orderItems) {
-        console.log("Loading order items:", existingOrder.orderItems);
-        const items = existingOrder.orderItems.map((item) => ({
+      const orderItems = existingOrder?.order_items || existingOrder?.orderItems;
+
+      if (existingOrder && orderItems) {
+        console.log("Loading order items:", orderItems);
+        const items = orderItems.map((item) => ({
           key: item.product_id,
           product_id: item.product_id,
           name: item.product?.name || `Product ${item.product_id}`,
@@ -209,7 +225,9 @@ export default function OrderDesk() {
       setCustomerPhone("");
       setExistingCustomerId(null);
     }
-  }, [selectedTable, orderType, orders]);
+    // Only run this effect when table selection changes, NOT when orders update in background
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTable, orderType]);
 
   const handlePhoneChange = (value) => {
     const phone = value.trim();
@@ -248,14 +266,25 @@ export default function OrderDesk() {
   }, [products, keyword, selectedCategory]);
 
   const addToCart = (product) => {
+    const capacity = getProductCapacity(product);
+
     setCart((prev) => {
       const found = prev.find((item) => item.product_id === product.id);
       if (found) {
+        if (capacity !== null && found.quantity >= capacity) {
+          message.warning(`Không thể thêm! Món "${product.name}" chỉ còn lại tối đa ${capacity} phần khả dụng dựa trên kho nguyên liệu.`);
+          return prev;
+        }
         return prev.map((item) =>
           item.product_id === product.id
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
+      }
+
+      if (capacity !== null && capacity <= 0) {
+        message.error(`Món "${product.name}" đã hết nguyên liệu chế biến!`);
+        return prev;
       }
 
       return [
@@ -282,18 +311,57 @@ export default function OrderDesk() {
     );
   };
 
+  const removeItem = (productId) => {
+    setCart((prev) => prev.filter((item) => item.product_id !== productId));
+  };
+
   const updateQty = (productId, quantity) => {
+    const product = products.find((p) => p.id === productId);
+    if (!product) return;
+
+    const capacity = getProductCapacity(product);
+    const targetQty = Number(quantity || 0);
+
+    if (targetQty === 0) {
+      Modal.confirm({
+        title: "⚠️ Xác nhận xoá món ăn",
+        content: `Bạn có chắc chắn muốn xoá món "${product.name}" khỏi danh sách gọi món không?`,
+        okText: "Đồng ý xoá",
+        okType: "danger",
+        cancelText: "Hủy bỏ",
+        onOk: () => {
+          removeItem(productId);
+          message.success(`Đã xoá món "${product.name}"`);
+        },
+        onCancel: () => {
+          // Reset to 1 on cancellation
+          setCart((prev) =>
+            prev.map((item) =>
+              item.product_id === productId ? { ...item, quantity: 1 } : item
+            )
+          );
+        }
+      });
+      return;
+    }
+
+    if (capacity !== null && targetQty > capacity) {
+      message.warning(`Không đủ nguyên liệu! Món "${product.name}" chỉ còn lại tối đa ${capacity} phần chế biến.`);
+      setCart((prev) =>
+        prev.map((item) =>
+          item.product_id === productId ? { ...item, quantity: capacity } : item
+        )
+      );
+      return;
+    }
+
     setCart((prev) =>
       prev.map((item) =>
         item.product_id === productId
-          ? { ...item, quantity: Math.max(1, Number(quantity || 1)) }
+          ? { ...item, quantity: targetQty }
           : item
       )
     );
-  };
-
-  const removeItem = (productId) => {
-    setCart((prev) => prev.filter((item) => item.product_id !== productId));
   };
 
   const total = useMemo(
@@ -326,7 +394,7 @@ export default function OrderDesk() {
       // If updating existing order
       if (currentOrderId) {
         const originalOrder = orders.find((o) => o.id === currentOrderId);
-        const originalItems = originalOrder?.orderItems || [];
+        const originalItems = originalOrder?.order_items || originalOrder?.orderItems || [];
 
         // Items to delete: exist in original but not in current cart
         const itemIdsToKeep = cart
@@ -540,7 +608,8 @@ export default function OrderDesk() {
                   ? image.url || `http://localhost:8000/storage/${image.image_url}`
                   : null;
 
-                const isOutOfStock = Number(p.status) === 0;
+                const capacity = getProductCapacity(p);
+                const isOutOfStock = Number(p.status) === 0 || (capacity !== null && capacity <= 0);
 
                 return (
                   <div key={p.id} style={styles.productCard}>
@@ -557,6 +626,10 @@ export default function OrderDesk() {
                       )}
                     </div>
                     <div style={styles.productName}>{p.name}</div>
+                    {/* Capacity Indicator */}
+                    <div style={{ fontSize: 11, color: capacity === null ? "#22c55e" : capacity <= 3 ? "#ef4444" : "#64748b", fontWeight: "500", marginTop: -4 }}>
+                      {capacity === null ? "🟢 Còn hàng" : capacity > 0 ? `📦 Còn: ${capacity} phần` : "🔴 Hết nguyên liệu"}
+                    </div>
                     <div style={styles.productPrice}>{formatMoney(p.price)}</div>
                     <Button
                       type="primary"
@@ -641,7 +714,7 @@ export default function OrderDesk() {
                     <div style={styles.cartLinePrice}>{formatMoney(item.price)}</div>
                   </div>
                   <InputNumber
-                    min={1}
+                    min={0}
                     value={item.quantity}
                     onChange={(val) => updateQty(item.product_id, val)}
                   />
@@ -752,7 +825,7 @@ export default function OrderDesk() {
               </tr>
             </thead>
             <tbody>
-              {activeOrderToPrint.orderItems?.map((item) => (
+              {(activeOrderToPrint.order_items || activeOrderToPrint.orderItems)?.map((item) => (
                 <tr key={item.id} style={{ borderBottom: "1px dotted #000" }}>
                   <td style={{ fontSize: 13, padding: "4px 0" }}>
                     <strong>{item.product?.name}</strong>

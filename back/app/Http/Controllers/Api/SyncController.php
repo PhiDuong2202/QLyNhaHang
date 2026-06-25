@@ -22,8 +22,8 @@ class SyncController extends Controller
             ->whereNotIn('status', ['completed', 'cancelled'])
             ->get();
             
-        // Load all products to check stock status changes
-        $products = Product::with('images')->get();
+        // Load all products with images and recipes to check stock status and capacity
+        $products = Product::with(['images', 'recipes.ingredient'])->get();
 
         return response()->json([
             'tables' => $tables,
