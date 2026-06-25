@@ -83,6 +83,27 @@ export default function Customers() {
         phone: values.phone?.trim() || null,
       };
 
+      const existingPhoneCustomer = payload.phone
+        ? customers.find(
+            (customer) =>
+              customer.phone && customer.phone.trim() === payload.phone
+          )
+        : null;
+
+      if (!editing && existingPhoneCustomer) {
+        message.warning(
+          "Số điện thoại này đã tồn tại, khách hàng đã có trong hệ thống. Vui lòng sử dụng thông tin khác hoặc chỉnh sửa khách hiện có."
+        );
+        return;
+      }
+
+      if (editing && existingPhoneCustomer && existingPhoneCustomer.id !== editing.id) {
+        message.warning(
+          "Số điện thoại này đang được sử dụng bởi khách hàng khác. Vui lòng dùng số khác."
+        );
+        return;
+      }
+
       if (editing) {
         await api.put(`/customers/${editing.id}`, payload);
         message.success("Cập nhật khách hàng thành công");

@@ -1,8 +1,9 @@
-﻿import { Menu } from "antd";
+import { Menu } from "antd";
 import {
   ShoppingCartOutlined,
   OrderedListOutlined,
   TeamOutlined,
+  FireOutlined,
 } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -13,6 +14,7 @@ export default function StaffSidebar() {
   const items = [
     { key: "/staff", icon: <ShoppingCartOutlined />, label: "Đặt đơn" },
     { key: "/staff/orders", icon: <OrderedListOutlined />, label: "Đơn đang xử lý" },
+    { key: "/staff/kitchen", icon: <FireOutlined />, label: "Bếp (KDS)" },
   ];
 
   return (

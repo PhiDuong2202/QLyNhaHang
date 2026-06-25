@@ -12,7 +12,10 @@ use App\Http\Controllers\Api\{
     OrderItemController,
     PaymentController,
     ReviewController,
-    UserController
+    UserController,
+    SyncController,
+    IngredientController,
+    RecipeController
 };
 use App\Http\Controllers\AuthController;
 
@@ -47,4 +50,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('order-items', OrderItemController::class);
     Route::apiResource('payments', PaymentController::class);
     Route::apiResource('users', UserController::class);
+
+    // Sync, Ingredients and Recipes routes
+    Route::get('sync', [SyncController::class, 'sync']);
+    Route::post('ingredients/{id}/import', [IngredientController::class, 'importStock']);
+    Route::apiResource('ingredients', IngredientController::class);
+    Route::post('recipes/product/{productId}', [RecipeController::class, 'sync']);
+    Route::apiResource('recipes', RecipeController::class)->only(['index', 'store', 'destroy']);
 });

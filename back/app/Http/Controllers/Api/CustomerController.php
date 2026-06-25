@@ -29,6 +29,20 @@ class CustomerController extends Controller
             'phone' => 'nullable|string|max:30'
         ]);
 
+        $data['name'] = trim($data['name']);
+        $data['phone'] = isset($data['phone']) ? trim($data['phone']) : null;
+
+        if (!empty($data['phone'])) {
+            $existing = Customer::where('phone', $data['phone'])->first();
+            if ($existing) {
+                if (empty($existing->name) && !empty($data['name'])) {
+                    $existing->name = $data['name'];
+                    $existing->save();
+                }
+                return $existing;
+            }
+        }
+
         return Customer::create($data);
     }
 

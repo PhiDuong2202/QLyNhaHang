@@ -14,7 +14,9 @@ class OrderItemController extends Controller
         $data = $request->validate([
             'order_id' => 'required',
             'product_id' => 'required',
-            'quantity' => 'required|numeric'
+            'quantity' => 'required|numeric',
+            'notes' => 'nullable|string',
+            'status' => 'nullable|string|in:pending,cooking,ready,served'
         ]);
 
         $product = Product::findOrFail($data['product_id']);
@@ -23,7 +25,9 @@ class OrderItemController extends Controller
             'order_id' => $data['order_id'],
             'product_id' => $data['product_id'],
             'quantity' => $data['quantity'],
-            'price' => $product->price
+            'price' => $product->price,
+            'notes' => $data['notes'] ?? null,
+            'status' => $data['status'] ?? 'pending',
         ]);
     }
 
@@ -32,7 +36,9 @@ class OrderItemController extends Controller
         $orderItem = OrderItem::findOrFail($id);
 
         $data = $request->validate([
-            'quantity' => 'required|numeric|min:1'
+            'quantity' => 'sometimes|required|numeric|min:1',
+            'notes' => 'nullable|string',
+            'status' => 'nullable|string|in:pending,cooking,ready,served'
         ]);
 
         $orderItem->update($data);

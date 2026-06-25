@@ -29,6 +29,22 @@ class OrderController extends Controller
 
         $orderType = $data['order_type'] ?? 'dine_in';
 
+        // Xử lý tranh chấp đặt bàn (Conflict handling)
+        if ($orderType !== 'take_away' && !empty($data['table_id'])) {
+            $table = Table::find($data['table_id']);
+            if ($table) {
+                $activeOrderExists = Order::where('table_id', $table->id)
+                    ->whereNotIn('status', ['completed', 'cancelled'])
+                    ->exists();
+
+                if ($activeOrderExists || in_array($table->status, ['occupied', 'reserved'])) {
+                    return response()->json([
+                        'message' => "Bàn {$table->name} đã có khách hoặc đang được đặt chỗ bởi nhân viên khác. Vui lòng chọn bàn khác."
+                    ], 409);
+                }
+            }
+        }
+
         $order = Order::create([
             'table_id' => $orderType === 'take_away' ? null : ($data['table_id'] ?? null),
             'user_id' => Auth::id(),
@@ -65,6 +81,22 @@ class OrderController extends Controller
             'order_type' => 'nullable|string|in:dine_in,take_away,preorder',
             'payment_method' => 'nullable|string',
         ]);
+
+        // Kiểm tra tranh chấp khi chuyển bàn (Conflict handling for moving table)
+        if (isset($data['table_id']) && $data['table_id'] != $order->table_id) {
+            $newTable = Table::find($data['table_id']);
+            if ($newTable) {
+                $activeOrderExists = Order::where('table_id', $newTable->id)
+                    ->whereNotIn('status', ['completed', 'cancelled'])
+                    ->exists();
+
+                if ($activeOrderExists || in_array($newTable->status, ['occupied', 'reserved'])) {
+                    return response()->json([
+                        'message' => "Bàn {$newTable->name} đã có khách hoặc đang được phục vụ. Không thể chuyển sang bàn này."
+                    ], 409);
+                }
+            }
+        }
 
         $order->update($data);
 

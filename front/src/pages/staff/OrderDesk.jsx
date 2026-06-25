@@ -14,6 +14,8 @@ import {
   Spin,
   Card,
   Divider,
+  notification,
+  Modal,
 } from "antd";
 import {
   SearchOutlined,
@@ -21,6 +23,7 @@ import {
   DeleteOutlined,
   ShoppingCartOutlined,
   ArrowLeftOutlined,
+  PrinterOutlined,
 } from "@ant-design/icons";
 import api from "../../services/api";
 import useDarkMode from "../../hooks/useDarkMode";
@@ -46,6 +49,7 @@ export default function OrderDesk() {
   const [categories, setCategories] = useState(cachedCategories);
   const [customers, setCustomers] = useState(cachedCustomers);
   const [orders, setOrders] = useState([]);
+  const [activeOrderToPrint, setActiveOrderToPrint] = useState(null);
 
   const [selectedTable, setSelectedTable] = useState();
   const [currentOrderId, setCurrentOrderId] = useState(null);
@@ -57,23 +61,26 @@ export default function OrderDesk() {
   const [keyword, setKeyword] = useState("");
   const [cart, setCart] = useState([]);
 
+  // Load all initial data (static categories and customers, plus initial sync)
   const loadData = async ({ silent = false } = {}) => {
+    if (!silent) setIsFetching(true);
     try {
-      const [productsRes, tablesRes, categoriesRes, customersRes, ordersRes] = await Promise.all([
-        api.get("/products"),
-        api.get("/tables"),
+      const [syncRes, categoriesRes, customersRes] = await Promise.all([
+        api.get("/sync"),
         api.get("/categories"),
         api.get("/customers"),
-        api.get("/orders"),
       ]);
-      setProducts(Array.isArray(productsRes.data) ? productsRes.data : []);
-      setTables(Array.isArray(tablesRes.data) ? tablesRes.data : []);
+      
+      const fetchedProducts = Array.isArray(syncRes.data?.products) ? syncRes.data.products : [];
+      const fetchedTables = Array.isArray(syncRes.data?.tables) ? syncRes.data.tables : [];
+      const fetchedOrders = Array.isArray(syncRes.data?.orders) ? syncRes.data.orders : [];
+
+      setProducts(fetchedProducts);
+      setTables(fetchedTables);
+      setOrders(fetchedOrders);
+      
       setCategories(Array.isArray(categoriesRes.data) ? categoriesRes.data : []);
       setCustomers(Array.isArray(customersRes.data) ? customersRes.data : []);
-      
-      const ordersData = Array.isArray(ordersRes.data) ? ordersRes.data : [];
-      console.log("Loaded orders from API:", ordersData);
-      setOrders(ordersData);
     } catch (err) {
       console.log(err);
       if (!silent) {
@@ -89,6 +96,57 @@ export default function OrderDesk() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Optimized Coordinated Polling for tables, active orders, and products stock status
+  useEffect(() => {
+    const pollSync = async () => {
+      try {
+        const res = await api.get("/sync");
+        const newProducts = Array.isArray(res.data?.products) ? res.data.products : [];
+        const newTables = Array.isArray(res.data?.tables) ? res.data.tables : [];
+        const newOrders = Array.isArray(res.data?.orders) ? res.data.orders : [];
+        
+        setProducts((prevProducts) => {
+          if (prevProducts && prevProducts.length > 0) {
+            const outOfStockProducts = [];
+            newProducts.forEach((newP) => {
+              const oldP = prevProducts.find((p) => p.id === newP.id);
+              if (oldP) {
+                const oldStatus = Number(oldP.status);
+                const newStatus = Number(newP.status);
+                if (oldStatus !== 0 && newStatus === 0) {
+                  outOfStockProducts.push(newP);
+                }
+              }
+            });
+            
+            if (outOfStockProducts.length > 0) {
+              setTimeout(() => {
+                outOfStockProducts.forEach((p) => {
+                  notification.warning({
+                    message: "Thông báo hết món",
+                    description: `Món "${p.name}" vừa hết nguyên liệu! Hệ thống đã tự động khóa món.`,
+                    placement: "topRight",
+                    duration: 5,
+                  });
+                });
+              }, 0);
+            }
+          }
+          return newProducts;
+        });
+
+        setTables(newTables);
+        setOrders(newOrders);
+      } catch (err) {
+        console.error("Lỗi đồng bộ dữ liệu OrderDesk:", err);
+      }
+    };
+
+    const pollInterval = setInterval(pollSync, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(pollInterval);
+  }, []);
+
   useEffect(() => {
     if (orderType === "take_away") {
       setSelectedTable(undefined);
@@ -98,7 +156,6 @@ export default function OrderDesk() {
   // Load order items when table selection changes
   useEffect(() => {
     if (selectedTable && orderType === "dine_in") {
-      // Find existing order for this table with pending/processing status
       console.log("All orders:", orders);
       console.log("Looking for table:", selectedTable, "type:", typeof selectedTable);
       
@@ -111,7 +168,6 @@ export default function OrderDesk() {
             o.status === "Đang chờ" ||
             o.status === "Đang làm"
           );
-          console.log(`Order ${o.id}: table_id=${o.table_id} (${typeof o.table_id}), status='${o.status}', tableMatch=${tableMatch}, statusMatch=${statusMatch}`);
           return tableMatch && statusMatch;
         }
       );
@@ -119,7 +175,6 @@ export default function OrderDesk() {
       console.log("selectedTable:", selectedTable, "existingOrder found:", existingOrder?.id || "none");
 
       if (existingOrder && existingOrder.orderItems) {
-        // Load order items into cart
         console.log("Loading order items:", existingOrder.orderItems);
         const items = existingOrder.orderItems.map((item) => ({
           key: item.product_id,
@@ -128,11 +183,11 @@ export default function OrderDesk() {
           price: Number(item.price || 0),
           quantity: item.quantity,
           order_item_id: item.id, // Track original order item for update
+          notes: item.notes || "", // Load notes!
         }));
         setCart(items);
         setCurrentOrderId(existingOrder.id);
 
-        // Load customer info if exists
         if (existingOrder.customer) {
           console.log("Loading customer:", existingOrder.customer);
           setCustomerName(existingOrder.customer.name || "");
@@ -140,7 +195,6 @@ export default function OrderDesk() {
           setExistingCustomerId(existingOrder.customer.id);
         }
       } else {
-        // New order - clear everything
         console.log("No existing order found, clearing cart");
         setCart([]);
         setCurrentOrderId(null);
@@ -149,7 +203,6 @@ export default function OrderDesk() {
         setExistingCustomerId(null);
       }
     } else if (!selectedTable && orderType === "dine_in") {
-
       setCart([]);
       setCurrentOrderId(null);
       setCustomerName("");
@@ -213,9 +266,20 @@ export default function OrderDesk() {
           name: product.name,
           price: Number(product.price || 0),
           quantity: 1,
+          notes: "", // default empty notes
         },
       ];
     });
+  };
+
+  const updateItemNotes = (productId, notes) => {
+    setCart((prev) =>
+      prev.map((item) =>
+        item.product_id === productId
+          ? { ...item, notes: notes }
+          : item
+      )
+    );
   };
 
   const updateQty = (productId, quantity) => {
@@ -237,6 +301,13 @@ export default function OrderDesk() {
     [cart]
   );
 
+  const handlePrintTicket = (order) => {
+    setActiveOrderToPrint(order);
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
+
   const submitOrder = async () => {
     const requiresTable = orderType !== "take_away";
 
@@ -254,7 +325,6 @@ export default function OrderDesk() {
     try {
       // If updating existing order
       if (currentOrderId) {
-        // Get original order items
         const originalOrder = orders.find((o) => o.id === currentOrderId);
         const originalItems = originalOrder?.orderItems || [];
 
@@ -278,22 +348,36 @@ export default function OrderDesk() {
             if (item.order_item_id) {
               return api.put(`/order-items/${item.order_item_id}`, {
                 quantity: item.quantity,
+                notes: item.notes, // pass notes!
               });
             } else {
               return api.post("/order-items", {
                 order_id: currentOrderId,
                 product_id: item.product_id,
                 quantity: item.quantity,
+                notes: item.notes, // pass notes!
               });
             }
           })
         );
 
-        const customerId = existingCustomerId || (customerName.trim() || customerPhone.trim() ? 
-          (await api.post("/customers", {
-            name: customerName.trim() || null,
-            phone: customerPhone.trim() || null,
-          })).data?.id : null);
+        let customerId = existingCustomerId;
+        const trimmedName = customerName.trim();
+        const trimmedPhone = customerPhone.trim();
+
+        if (!customerId && (trimmedName || trimmedPhone)) {
+          if (!trimmedName && trimmedPhone) {
+            message.warning("Vui lòng nhập tên khách hàng mới nếu số điện thoại chưa có trong hệ thống");
+            setLoading(false);
+            return;
+          }
+
+          const customerRes = await api.post("/customers", {
+            name: trimmedName || null,
+            phone: trimmedPhone || null,
+          });
+          customerId = customerRes.data?.id ?? null;
+        }
 
         const newTotal = cart.reduce(
           (sum, item) => sum + item.price * item.quantity,
@@ -310,33 +394,20 @@ export default function OrderDesk() {
         setCart([]);
         loadData({ silent: true });
       } else {
-        let customerId = null;
-        if (customerName.trim()) {
-          const customerRes = await api.post("/customers", {
-            name: customerName.trim(),
-            phone: customerPhone.trim() || null,
-          });
-          customerId = customerRes.data?.id ?? null;
-        }
+        let customerId = existingCustomerId;
+        const trimmedName = customerName.trim();
+        const trimmedPhone = customerPhone.trim();
 
-        if (!existingCustomerId && customerPhone.trim() && !customerName.trim()) {
-          message.warning("Vui lòng nhập tên khách hàng mới nếu số điện thoại chưa có trong hệ thống");
-          setLoading(false);
-          return;
-        }
+        if (!customerId && (trimmedName || trimmedPhone)) {
+          if (!trimmedName && trimmedPhone) {
+            message.warning("Vui lòng nhập tên khách hàng mới nếu số điện thoại chưa có trong hệ thống");
+            setLoading(false);
+            return;
+          }
 
-        if (!existingCustomerId && customerPhone.trim()) {
           const customersRes = await api.post("/customers", {
-            name: customerName.trim() || null,
-            phone: customerPhone.trim(),
-          });
-          customerId = customersRes.data?.id ?? null;
-        } else if (existingCustomerId) {
-          customerId = existingCustomerId;
-        } else if (customerName.trim()) {
-          const customersRes = await api.post("/customers", {
-            name: customerName.trim(),
-            phone: customerPhone.trim() || null,
+            name: trimmedName || null,
+            phone: trimmedPhone || null,
           });
           customerId = customersRes.data?.id ?? null;
         }
@@ -359,6 +430,7 @@ export default function OrderDesk() {
               order_id: orderId,
               product_id: item.product_id,
               quantity: item.quantity,
+              notes: item.notes, // pass notes!
             })
           )
         );
@@ -373,8 +445,22 @@ export default function OrderDesk() {
 
     } catch (err) {
       console.log(err);
+      const status = err?.response?.status;
       const msg = err?.response?.data?.message;
-      message.error(msg || "Không tạo được đơn");
+      
+      if (status === 409) {
+        Modal.error({
+          title: "⚠️ Tranh Chấp Đặt Bàn",
+          content: msg || "Bàn này đã được sử dụng hoặc đặt chỗ bởi một nhân viên khác. Sơ đồ bàn ăn sẽ tự động làm mới.",
+          okText: "Đồng ý",
+          onOk: () => {
+            setSelectedTable(undefined);
+            loadData({ silent: true });
+          }
+        });
+      } else {
+        message.error(msg || "Không tạo được đơn");
+      }
     } finally {
       setLoading(false);
     }
@@ -454,8 +540,15 @@ export default function OrderDesk() {
                   ? image.url || `http://localhost:8000/storage/${image.image_url}`
                   : null;
 
+                const isOutOfStock = Number(p.status) === 0;
+
                 return (
                   <div key={p.id} style={styles.productCard}>
+                    {isOutOfStock && (
+                      <div style={styles.outOfStockOverlay}>
+                        <span style={styles.outOfStockText}>HẾT MÓN</span>
+                      </div>
+                    )}
                     <div style={styles.imageWrap}>
                       {imageUrl ? (
                         <img src={imageUrl} alt={p.name} style={styles.productImage} />
@@ -470,8 +563,9 @@ export default function OrderDesk() {
                       icon={<PlusOutlined />}
                       block
                       onClick={() => addToCart(p)}
+                      disabled={isOutOfStock}
                     >
-                      Thêm
+                      {isOutOfStock ? "Hết món" : "Thêm"}
                     </Button>
                   </div>
                 );
@@ -540,7 +634,7 @@ export default function OrderDesk() {
               {cart.length === 0 && <Empty description="Chưa có món" />}
 
               {cart.map((item, index) => (
-                <div key={item.product_id} style={styles.cartRow}>
+                <div key={item.product_id} style={{ ...styles.cartRow, gridTemplateRows: "auto auto", height: "auto" }}>
                   <div style={styles.cartIndex}>{index + 1}</div>
                   <div style={styles.cartInfo}>
                     <div style={styles.cartName}>{item.name}</div>
@@ -558,6 +652,16 @@ export default function OrderDesk() {
                     icon={<DeleteOutlined />}
                     onClick={() => removeItem(item.product_id)}
                   />
+                  {/* Notes input row below */}
+                  <div style={{ gridColumn: "2 / 5", width: "100%", paddingBottom: 4 }}>
+                    <Input
+                      size="small"
+                      placeholder="Ghi chú (ít cay, không hành, nhiều đá...)"
+                      value={item.notes || ""}
+                      onChange={(e) => updateItemNotes(item.product_id, e.target.value)}
+                      style={{ fontSize: 11, borderRadius: 4 }}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
@@ -567,19 +671,110 @@ export default function OrderDesk() {
                 <span>Tổng tiền</span>
                 <strong>{formatMoney(total)}</strong>
               </div>
-              <Button
-                type="primary"
-                size="large"
-                loading={loading}
-                onClick={submitOrder}
-                block
-              >
-                {currentOrderId ? "Cập nhật đơn" : "Tạo đơn"}
-              </Button>
+              <Row gutter={8}>
+                {currentOrderId && (
+                  <Col span={8}>
+                    <Button
+                      icon={<PrinterOutlined />}
+                      block
+                      size="large"
+                      onClick={() => {
+                        const order = orders.find((o) => o.id === currentOrderId);
+                        if (order) handlePrintTicket(order);
+                      }}
+                    >
+                      In bếp
+                    </Button>
+                  </Col>
+                )}
+                <Col span={currentOrderId ? 16 : 24}>
+                  <Button
+                    type="primary"
+                    size="large"
+                    loading={loading}
+                    onClick={submitOrder}
+                    block
+                  >
+                    {currentOrderId ? "Cập nhật đơn" : "Tạo đơn"}
+                  </Button>
+                </Col>
+              </Row>
             </div>
           </div>
         </Col>
       </Row>
+
+      {/* CSS and Printer layout for browser print */}
+      <style>
+        {`
+          @media print {
+            body * {
+              visibility: hidden;
+            }
+            #order-desk-print-ticket, #order-desk-print-ticket * {
+              visibility: visible;
+            }
+            #order-desk-print-ticket {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 80mm;
+              padding: 5mm;
+              font-family: 'Courier New', Courier, monospace;
+              color: #000;
+              background: #fff;
+            }
+          }
+        `}
+      </style>
+
+      {/* Printer-friendly Thermal Receipt Layout */}
+      {activeOrderToPrint && (
+        <div id="order-desk-print-ticket" style={{ display: "none" }}>
+          <div style={{ textAlign: "center", borderBottom: "1px dashed #000", paddingBottom: 5, marginBottom: 5 }}>
+            <h2 style={{ margin: "0 0 5px 0", fontSize: 18 }}>NHÀ HÀNG QUÁN ĂN</h2>
+            <h3 style={{ margin: "0 0 5px 0", fontSize: 16 }}>PHIẾU CHẾ BIẾN BẾP</h3>
+            <p style={{ margin: 0, fontSize: 12 }}>Đơn hàng: #{activeOrderToPrint.id}</p>
+            <p style={{ margin: 0, fontSize: 12 }}>Ngày đặt: {new Date(activeOrderToPrint.created_at).toLocaleString("vi-VN")}</p>
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <p style={{ margin: "3px 0", fontSize: 14 }}><strong>BÀN: {activeOrderToPrint.table?.name || "MANG VỀ"}</strong></p>
+            <p style={{ margin: "3px 0", fontSize: 12 }}>Loại đơn: {activeOrderToPrint.order_type === "dine_in" ? "Tại chỗ" : activeOrderToPrint.order_type === "take_away" ? "Mang về" : "Đặt trước"}</p>
+            {activeOrderToPrint.customer && (
+              <p style={{ margin: "3px 0", fontSize: 12 }}>Khách hàng: {activeOrderToPrint.customer.name} - {activeOrderToPrint.customer.phone}</p>
+            )}
+          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse", borderTop: "1px dashed #000", borderBottom: "1px dashed #000", padding: "5px 0" }}>
+            <thead>
+              <tr style={{ borderBottom: "1px dashed #000" }}>
+                <th style={{ textAlign: "left", fontSize: 12, padding: "3px 0" }}>Món</th>
+                <th style={{ textAlign: "right", fontSize: 12, padding: "3px 0", width: 40 }}>SL</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activeOrderToPrint.orderItems?.map((item) => (
+                <tr key={item.id} style={{ borderBottom: "1px dotted #000" }}>
+                  <td style={{ fontSize: 13, padding: "4px 0" }}>
+                    <strong>{item.product?.name}</strong>
+                    {item.notes && (
+                      <div style={{ fontSize: 11, fontStyle: "italic", margin: "2px 0 0 5px" }}>
+                        * Ghi chú: {item.notes}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ textAlign: "right", fontSize: 15, fontWeight: "bold", padding: "4px 0" }}>
+                    {item.quantity}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ textAlign: "center", marginTop: 15, fontSize: 11 }}>
+            <p style={{ margin: 0 }}>Vui lòng chuẩn bị món ăn nhanh chóng.</p>
+            <p style={{ margin: "5px 0 0 0", fontStyle: "italic" }}>--- Hệ thống KDS ---</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -651,6 +846,7 @@ function createStyles(darkMode) {
       paddingRight: 4,
     },
     productCard: {
+      position: "relative",
       border: darkMode ? "1px solid #25314d" : "1px solid #dbe4f0",
       borderRadius: 10,
       background: darkMode ? "#0b1220" : "#fff",
@@ -658,6 +854,32 @@ function createStyles(darkMode) {
       display: "flex",
       flexDirection: "column",
       gap: 8,
+      overflow: "hidden",
+    },
+    outOfStockOverlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: darkMode ? "rgba(0, 0, 0, 0.7)" : "rgba(0, 0, 0, 0.55)",
+      backdropFilter: "blur(2px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 10,
+    },
+    outOfStockText: {
+      color: "#ff4d4f",
+      fontSize: "15px",
+      fontWeight: "bold",
+      border: "2px solid #ff4d4f",
+      padding: "4px 10px",
+      borderRadius: 6,
+      transform: "rotate(-12deg)",
+      background: darkMode ? "rgba(15, 23, 42, 0.85)" : "rgba(255, 255, 255, 0.9)",
+      letterSpacing: "1px",
+      boxShadow: "0 0 10px rgba(255, 77, 79, 0.4)",
     },
     imageWrap: {
       height: 90,

@@ -187,11 +187,39 @@ export default function Home() {
                         }}
                         bodyStyle={{ flex: 1, display: "flex", flexDirection: "column", padding: "24px" }}
                         cover={
-                          <div className="card-image-wrapper" style={{ height: 220, background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                          <div className="card-image-wrapper" style={{ height: 220, background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", position: "relative" }}>
                             {imgUrl ? (
-                              <img alt={p.name} src={imgUrl} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.5s ease" }} className="card-img" />
+                              <img alt={p.name} src={imgUrl} style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.5s ease", filter: Number(p.status) === 0 ? "grayscale(100%) opacity(60%)" : "none" }} className="card-img" />
                             ) : (
                               <span style={{ color: "#cbd5e1", fontSize: "60px" }}>🍽️</span>
+                            )}
+                            {Number(p.status) === 0 && (
+                              <div style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                background: "rgba(0, 0, 0, 0.45)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                zIndex: 5,
+                                backdropFilter: "blur(1px)"
+                              }}>
+                                <span style={{
+                                  color: "#ff4d4f",
+                                  fontSize: "18px",
+                                  fontWeight: "bold",
+                                  border: "3px solid #ff4d4f",
+                                  padding: "6px 16px",
+                                  borderRadius: "6px",
+                                  transform: "rotate(-12deg)",
+                                  background: "rgba(255, 255, 255, 0.95)",
+                                  boxShadow: "0 0 10px rgba(255, 77, 79, 0.3)",
+                                  letterSpacing: "1.5px"
+                                }}>HẾT MÓN</span>
+                              </div>
                             )}
                           </div>
                         }

@@ -10,6 +10,8 @@ import {
     SafetyCertificateOutlined,
     DollarCircleOutlined,
     TeamOutlined,
+    DatabaseOutlined,
+    CalculatorOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 
@@ -21,6 +23,8 @@ export default function Sidebar() {
         { key: "/admin", icon: <DashboardOutlined />, label: "Dashboard" },
         { key: "/admin/categories", icon: <AppstoreOutlined />, label: "Danh mục" },
         { key: "/admin/products", icon: <ShoppingOutlined />, label: "Món ăn" },
+        { key: "/admin/recipes", icon: <CalculatorOutlined />, label: "Định lượng món" },
+        { key: "/admin/ingredients", icon: <DatabaseOutlined />, label: "Kho nguyên liệu" },
         { key: "/admin/orders", icon: <OrderedListOutlined />, label: "Đơn hàng" },
         { key: "/admin/tables", icon: <TableOutlined />, label: "Bàn ăn" },
         { key: "/admin/customers", icon: <UserOutlined />, label: "Khách hàng" },

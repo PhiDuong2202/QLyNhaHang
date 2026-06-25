@@ -5,6 +5,7 @@ import StaffLayout from "../layouts/StaffLayout";
 import OrderDesk from "../pages/staff/OrderDesk";
 import StaffOrders from "../pages/staff/StaffOrders";
 import StaffLogin from "../pages/staff/StaffLogin";
+import KitchenDesk from "../pages/staff/KitchenDesk";
 
 export default function StaffRoutes() {
   return (
@@ -21,6 +22,7 @@ export default function StaffRoutes() {
       >
         <Route index element={<OrderDesk />} />
         <Route path="orders" element={<StaffOrders />} />
+        <Route path="kitchen" element={<KitchenDesk />} />
       </Route>
     </Routes>
   );
