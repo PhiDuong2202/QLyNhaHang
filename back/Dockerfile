@@ -1,22 +1,19 @@
-FROM php:8.4-apache
-
-WORKDIR /var/www/html
+FROM php:8.3-cli
 
 RUN apt-get update && apt-get install -y \
-    git unzip libzip-dev libpq-dev \
-    && docker-php-ext-install pdo pdo_pgsql zip
+    git \
+    unzip \
+    libpq-dev \
+    && docker-php-ext-install pdo pdo_pgsql
 
-# Composer
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-COPY . /var/www/html
+WORKDIR /app
 
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+COPY . .
 
-RUN php artisan key:generate
-RUN php artisan migrate --force
+RUN composer install --no-dev --optimize-autoloader
 
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+EXPOSE 10000
 
-EXPOSE 80
-CMD ["docker-php-entrypoint", "apache2-foreground"]
+CMD php artisan serve --host=0.0.0.0 --port=${PORT:-10000}
