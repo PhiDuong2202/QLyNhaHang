@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreProductRequest;
 use Illuminate\Support\Facades\Storage;
+use App\Services\ImageUploadService;
 
 class ProductController extends Controller
 {
@@ -37,10 +38,10 @@ class ProductController extends Controller
         // nếu có ảnh kèm theo thì xử lý và lưu vào bảng product_images
         if ($request->hasFile('image')) {
             $file = $request->file('image');
-            $base64 = 'data:' . $file->getMimeType() . ';base64,' . base64_encode(file_get_contents($file->getRealPath()));
-
+            $uploadedFileUrl = ImageUploadService::upload($file);
+ 
             $product->images()->create([
-                'image_url' => $base64,
+                'image_url' => $uploadedFileUrl,
             ]);
         }
 
@@ -66,20 +67,20 @@ class ProductController extends Controller
             $request->validate([
                 'image' => 'image|mimes:jpg,jpeg,png|max:2048',
             ]);
-
+ 
             $file = $request->file('image');
-            $base64 = 'data:' . $file->getMimeType() . ';base64,' . base64_encode(file_get_contents($file->getRealPath()));
-
+            $uploadedFileUrl = ImageUploadService::upload($file);
+ 
             // nếu đã có ảnh thì cập nhật ảnh đầu tiên, không thì tạo mới
             $productImage = $product->images()->first();
-
+ 
             if ($productImage) {
                 $productImage->update([
-                    'image_url' => $base64,
+                    'image_url' => $uploadedFileUrl,
                 ]);
             } else {
                 $product->images()->create([
-                    'image_url' => $base64,
+                    'image_url' => $uploadedFileUrl,
                 ]);
             }
         }

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\ProductImage;
 use Illuminate\Support\Facades\Storage;
+use App\Services\ImageUploadService;
 
 class ProductImageController extends Controller
 {
@@ -18,17 +19,17 @@ class ProductImageController extends Controller
         ]);
 
         $file = $request->file('image');
-        $base64 = 'data:' . $file->getMimeType() . ';base64,' . base64_encode(file_get_contents($file->getRealPath()));
+        $uploadedFileUrl = ImageUploadService::upload($file);
 
         $productImage = ProductImage::create([
             'product_id' => $data['product_id'],
-            'image_url' => $base64
+            'image_url' => $uploadedFileUrl
         ]);
 
         return response()->json([
             'message' => 'Upload thành công',
             'data' => $productImage,
-            'url' => $base64
+            'url' => $uploadedFileUrl
         ]);
     }
 
@@ -42,16 +43,16 @@ class ProductImageController extends Controller
         $productImage = ProductImage::findOrFail($id);
 
         $file = $request->file('image');
-        $base64 = 'data:' . $file->getMimeType() . ';base64,' . base64_encode(file_get_contents($file->getRealPath()));
+        $uploadedFileUrl = ImageUploadService::upload($file);
 
         $productImage->update([
-            'image_url' => $base64
+            'image_url' => $uploadedFileUrl
         ]);
 
         return response()->json([
             'message' => 'Cập nhật thành công',
             'data' => $productImage,
-            'url' => $base64
+            'url' => $uploadedFileUrl
         ]);
     }
 }
