@@ -106,7 +106,7 @@ export default function Products() {
   const tableData = products.map((p, i) => {
     const firstImage = p.images?.[0];
     const imageUrl = firstImage
-      ? firstImage.url || `${STORAGE_BASE_URL}/${firstImage.image_url}`
+      ? firstImage.url || ((firstImage.image_url.startsWith("http") || firstImage.image_url.startsWith("data:")) ? firstImage.image_url : `${STORAGE_BASE_URL}/${firstImage.image_url}`)
       : null;
 
     return {
@@ -171,7 +171,7 @@ export default function Products() {
                 ? (() => {
                   const firstImage = editing.images?.[0];
                   const imageUrl = firstImage
-                    ? firstImage.url || `${STORAGE_BASE_URL}/${firstImage.image_url}`
+                    ? firstImage.url || ((firstImage.image_url.startsWith("http") || firstImage.image_url.startsWith("data:")) ? firstImage.image_url : `${STORAGE_BASE_URL}/${firstImage.image_url}`)
                     : null;
 
                   return {

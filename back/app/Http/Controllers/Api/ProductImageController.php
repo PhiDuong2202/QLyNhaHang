@@ -6,8 +6,6 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\ProductImage;
 use Illuminate\Support\Facades\Storage;
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver;
 
 class ProductImageController extends Controller
 {
@@ -20,27 +18,17 @@ class ProductImageController extends Controller
         ]);
 
         $file = $request->file('image');
-
-        $manager = new ImageManager(new Driver());
-
-        // resize nhưng giữ tỉ lệ
-        $img = $manager->read($file)->scale(width: 500);
-
-        // tránh trùng tên file
-        $filename = uniqid() . '.jpg';
-        $path = 'products/' . $filename;
-
-        Storage::disk('public')->put($path, (string) $img->toJpeg(80));
+        $base64 = 'data:' . $file->getMimeType() . ';base64,' . base64_encode(file_get_contents($file->getRealPath()));
 
         $productImage = ProductImage::create([
             'product_id' => $data['product_id'],
-            'image_url' => $path
+            'image_url' => $base64
         ]);
 
         return response()->json([
             'message' => 'Upload thành công',
             'data' => $productImage,
-            'url' => asset('storage/' . $path)
+            'url' => $base64
         ]);
     }
 
@@ -53,29 +41,17 @@ class ProductImageController extends Controller
 
         $productImage = ProductImage::findOrFail($id);
 
-        // XÓA ẢNH CŨ
-        if ($productImage->image_url && Storage::disk('public')->exists($productImage->image_url)) {
-            Storage::disk('public')->delete($productImage->image_url);
-        }
-
         $file = $request->file('image');
-
-        $manager = new ImageManager(new Driver());
-        $img = $manager->read($file)->scale(width: 500);
-
-        $filename = uniqid() . '.jpg';
-        $path = 'products/' . $filename;
-
-        Storage::disk('public')->put($path, (string) $img->toJpeg(80));
+        $base64 = 'data:' . $file->getMimeType() . ';base64,' . base64_encode(file_get_contents($file->getRealPath()));
 
         $productImage->update([
-            'image_url' => $path
+            'image_url' => $base64
         ]);
 
         return response()->json([
             'message' => 'Cập nhật thành công',
             'data' => $productImage,
-            'url' => asset('storage/' . $path)
+            'url' => $base64
         ]);
     }
 }

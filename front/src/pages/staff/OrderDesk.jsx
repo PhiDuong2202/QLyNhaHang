@@ -605,7 +605,7 @@ export default function OrderDesk() {
               {filteredProducts.map((p) => {
                 const image = p.images?.[0];
                 const imageUrl = image
-                  ? image.url || `${STORAGE_BASE_URL}/${image.image_url}`
+                  ? image.url || ((image.image_url.startsWith("http") || image.image_url.startsWith("data:")) ? image.image_url : `${STORAGE_BASE_URL}/${image.image_url}`)
                   : null;
 
                 const capacity = getProductCapacity(p);
