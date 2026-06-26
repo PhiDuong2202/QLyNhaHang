@@ -25,7 +25,7 @@ import {
   ArrowLeftOutlined,
   PrinterOutlined,
 } from "@ant-design/icons";
-import api from "../../services/api";
+import api, { STORAGE_BASE_URL } from "../../services/api";
 import useDarkMode from "../../hooks/useDarkMode";
 import TableSelection from "../../components/TableSelection";
 
@@ -605,7 +605,7 @@ export default function OrderDesk() {
               {filteredProducts.map((p) => {
                 const image = p.images?.[0];
                 const imageUrl = image
-                  ? image.url || `http://localhost:8000/storage/${image.image_url}`
+                  ? image.url || `${STORAGE_BASE_URL}/${image.image_url}`
                   : null;
 
                 const capacity = getProductCapacity(p);

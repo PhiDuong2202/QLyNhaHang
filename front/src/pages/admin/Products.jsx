@@ -1,6 +1,6 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { message } from "antd";
-import api from "../../services/api";
+import api, { STORAGE_BASE_URL } from "../../services/api";
 import AdminTable from "../../components/AdminTable";
 import AdminForm from "../../components/AdminForm";
 import Modal from "../../components/Modal";
@@ -72,18 +72,16 @@ export default function Products() {
       }
 
       if (editing) {
-        await axios.post(`http://localhost:8000/api/products/${editing.id}?_method=PUT`, formData, {
+        await api.post(`/products/${editing.id}?_method=PUT`, formData, {
           headers: {
             "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         });
         message.success("Cập nhật thành công");
       } else {
-        await axios.post("http://localhost:8000/api/products", formData, {
+        await api.post("/products", formData, {
           headers: {
             "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         });
         message.success("Thêm thành công");
@@ -108,7 +106,7 @@ export default function Products() {
   const tableData = products.map((p, i) => {
     const firstImage = p.images?.[0];
     const imageUrl = firstImage
-      ? firstImage.url || `http://localhost:8000/storage/${firstImage.image_url}`
+      ? firstImage.url || `${STORAGE_BASE_URL}/${firstImage.image_url}`
       : null;
 
     return {
@@ -171,16 +169,16 @@ export default function Products() {
             initialData={
               editing
                 ? (() => {
-                    const firstImage = editing.images?.[0];
-                    const imageUrl = firstImage
-                      ? firstImage.url || `http://localhost:8000/storage/${firstImage.image_url}`
-                      : null;
+                  const firstImage = editing.images?.[0];
+                  const imageUrl = firstImage
+                    ? firstImage.url || `${STORAGE_BASE_URL}/${firstImage.image_url}`
+                    : null;
 
-                    return {
-                      ...editing,
-                      imagePreview: imageUrl,
-                    };
-                  })()
+                  return {
+                    ...editing,
+                    imagePreview: imageUrl,
+                  };
+                })()
                 : { category_id: selectedCat }
             }
           />

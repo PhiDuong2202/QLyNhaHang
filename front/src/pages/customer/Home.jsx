@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, Rate, Button, Modal, Form, Input, message, Layout, Typography, Row, Col, Badge, Select, ConfigProvider } from "antd";
 import { StarFilled, EnvironmentOutlined, PhoneOutlined, HeartFilled, FacebookFilled, InstagramOutlined, MailOutlined } from "@ant-design/icons";
-import api from "../../services/api";
+import api, { STORAGE_BASE_URL } from "../../services/api";
 
 const { Header, Content, Footer } = Layout;
 const { Title, Paragraph, Text } = Typography;
@@ -168,7 +168,7 @@ export default function Home() {
                 const firstImg = p.images?.[0];
                 const avgRating = calculateAverageRating(p.reviews || []);
                 const reviewCount = p.reviews?.length || 0;
-                const imgUrl = firstImg ? (firstImg.url || `http://localhost:8000/storage/${firstImg.image_url}`) : null;
+                const imgUrl = firstImg ? (firstImg.url || `${STORAGE_BASE_URL}/${firstImg.image_url}`) : null;
                 return (
                   <Col xs={24} sm={12} md={12} lg={8} key={p.id}>
                     <Badge.Ribbon text={p.category?.name || "Món ăn"} color="#10b981" style={{ fontSize: "12px", fontWeight: 600, top: 12 }}>

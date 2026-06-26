@@ -1,11 +1,18 @@
 import axios from "axios";
 
+const rawApiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
+const apiURL = rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl.replace(/\/$/, "")}/api`;
+
 const api = axios.create({
-  baseURL: "http://localhost:8000/api",
+  baseURL: apiURL,
   headers: {
     "Content-Type": "application/json",
   },
 });
+
+// Export the base storage URL for use in image URLs throughout the app
+const host = apiURL.replace(/\/api\/?$/, "");
+export const STORAGE_BASE_URL = `${host}/storage`;
 
 const CACHE_TTL_MS = 60 * 1000;
 const responseCache = new Map();
